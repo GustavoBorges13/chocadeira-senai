@@ -1,0 +1,228 @@
+                                                       //************************************VERSAO OFICIAL************************************ 
+//Programador: Gustavo Borges
+//Auxiliadores e montadores da chocadeira: Arley Gonçalves, Gabriel Henrique
+//Em colaboração com SESI SENAI
+
+//BIBLIOTECAS                                              
+#include <LiquidCrystal.h>
+#include <Thermistor3.h>
+
+//DISPLAY LCD
+LiquidCrystal lcd(21, 20, 19, 18, 17, 16);
+
+
+//sensor temperatura
+Thermistor temp(0);
+double resistor = 10000;
+double average = 0;
+int sample = 5000;
+
+//TEMPORIZADOR
+int secs = 0;
+int minutes = 0;
+int hours = 0;
+long interval = 1000; //ms
+long previous = 0;
+unsigned long current = millis();
+
+//MOTOR
+unsigned long tempo_motor = 0;
+unsigned long tempo_motor_ciclo = 3L * 60L * 60L * 1000L; // A cada 8 horas o motor ativa e desativa.
+unsigned long tempo_Ativado = 0;
+unsigned long tempo_Desativado = 0;
+const int tempo_Operacao = 0.0090L * 60L * 60L * 1000L; // o motor executa durante 38 segundos.
+
+//RELES
+const int releUM (4);
+boolean rele2 = LOW;
+boolean cond_inicial = 1;
+int pino_rele2 = 5;
+int releTRES = 6;
+
+//LED
+unsigned long millis_antes = 0;
+const int intervalo = 1; // N.D
+int led1 = 2;
+int led2 = 8;
+int led3 = 9;
+int led4 = 10;
+int led5 = 11;
+int led6 = 12;
+int led7 = 13;
+
+void setup() {  //DEFININDO SAIDAS
+
+  //Define o número de colunas e linhas do LCD
+  lcd.begin(16, 2);
+
+  //serial de ligar e desligar o motor
+  Serial.print("Ciclo ddo motor => ");
+  Serial.print(tempo_motor_ciclo);
+  Serial.print("; ");
+  print_clock(tempo_motor_ciclo);
+  Serial.print("Tempo de operacao do motor =>> ");
+  Serial.print(tempo_Operacao);
+  Serial.print("; ");
+  print_clock(tempo_Operacao);
+  Serial.begin(9600);
+
+  //saídas
+  pinMode(releUM, OUTPUT);
+  pinMode(pino_rele2, OUTPUT);
+  pinMode(releTRES, OUTPUT);
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  pinMode(led3, OUTPUT);
+  pinMode(led4, OUTPUT);
+  pinMode(led5, OUTPUT);
+  pinMode(led6, OUTPUT);
+  pinMode(led7, OUTPUT);
+}
+void loop() {  //INICIO DAS TAREFAS E APLICAÇÕES
+  tarefa1();
+  tarefa2();
+  tarefa3();
+  LIGAR_LED_1();
+  LIGAR_LED_2();
+  LIGAR_LED_3();
+  LIGAR_LED_4();
+  LIGAR_LED_5();
+  LIGAR_LED_6();
+  LIGAR_LED_7();
+
+  //TEMPORIZADOR DO MOTOR
+  unsigned long tempo = millis();
+  print_clock(tempo);
+  //condição inicial: motor liga durante um determinado intervalo de tempo
+  if (cond_inicial == 0) {
+    rele2 = !rele2; //inverter boolean
+    digitalWrite(pino_rele2, rele2);
+    Serial.println("Condicao Inicial... Motor Ligado.");
+    cond_inicial = 0; //inverter boolean (condição inicial = false)
+    tempo_motor = tempo_Ativado = tempo; //guardar tempo
+  } if (cond_inicial == 1) {
+    // se tempo atual menos ultimo tempo da ativação guardado for maior que o tempo de operação do motor
+    if ((tempo - tempo_Ativado > tempo_Operacao) && (rele2 == LOW)) {
+      tempo_motor = tempo; //guardar millis
+      rele2 = !rele2; // inverter boolean
+      digitalWrite(pino_rele2, rele2); // enviar novo valor ao pino
+      Serial.println("Motor Desligado!");
+    }
+    // se tempo atual menos ultimo tempo guardado for maior que o ciclo desejado
+    if (tempo - tempo_motor > tempo_motor_ciclo) {
+      tempo_motor = tempo_Ativado = tempo; // guardar millis
+      rele2 = !rele2;// inverter boolean
+      digitalWrite(pino_rele2, rele2);// enviar novo valor ao pino
+      Serial.println("Motor Ligado!");
+    }
+  }
+  delay(1000);
+}
+//CALCULO DO CONVERSOR DE TEMPO DO MOTOR
+void print_clock(unsigned long t) {
+  Serial.print((t / 1000 / 60 / 60)); // converter millis para horas
+  Serial.print(" horas, ");
+  Serial.print((t / 1000 / 60) % 60); // converter millis para minutos
+  Serial.print(" minutos, ");
+  Serial.print((t / 1000) % 60); // converter millis para segundos
+  Serial.println(" segundos");
+  // o simbolo % (modulo) é o resto da divisao, serve para loopar o valor, por exemplo:
+  // 2 % 10 => 2; dois dividido por dez é zero, resta 2
+  // 9 % 10 => 9; nove dividido por dez é zero, resta 9
+  // 10 % 10 => 0; dez dividido por dez é um, resta 0
+  // 12 % 10 => 2; doze dividido por dez é um, resta 2
+}
+void tarefa1() { //SENSOR DE TEMPERATURA
+  //SENSOR DE TEMPERATURA
+  for (int index = 0; index < sample; index++) {
+    double temperature = temp.getTemp(resistor);
+    average += temperature;
+    delayMicroseconds(1);
+  }
+  average = average / sample;
+  Serial.print("A Temperatura é : ");
+  Serial.print( average );
+  Serial.println(" °C");
+  delay(1000);
+  if (average < 37.65) {
+    digitalWrite (releUM, LOW);
+  } else {
+    digitalWrite (releUM, HIGH);
+  }
+}
+void tarefa2() { //PROGRAMAÇÃO DAS VENTOINHAS
+  if (average > 37.55) {
+    digitalWrite (releTRES, LOW);
+  } else {
+    digitalWrite (releTRES, HIGH);
+  }
+}
+void tarefa3() { //PROGRAMAÇÃO DO DISLAY LCD
+  //Posiciona o cursor na coluna 3, linha 0;
+  lcd.clear();
+  lcd.setCursor(3, 0);
+  //Envia o texto entre aspas para o LCD
+  lcd.print("SESI SENAI");
+  lcd.setCursor(2, 1);
+  // display each character to the LCD
+  lcd.print("Temp: ");
+  lcd.print(average);
+  lcd.print( "C");
+
+}
+void LIGAR_LED_1() { //ligar led 1 =  QUANDO LIGAR A CHOCADEIRA - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (1000 * intervalo))
+  {
+    digitalWrite(led1, LOW);
+  } else {
+    digitalWrite(led1, HIGH);
+  }
+}
+void LIGAR_LED_2() { //ligar led 2 = LIGAR APÓS 4 DIAS - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (86400000 * 4 * intervalo))
+  {
+    digitalWrite(led2, LOW);
+  } else {
+    digitalWrite(led2, HIGH);
+  }
+}
+void LIGAR_LED_3() { //ligar led 3 = LIGAR APÓS 7 DIAS - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (86400000 * 7 * intervalo))
+  {
+    digitalWrite(led3, LOW);
+  } else {
+    digitalWrite(led3, HIGH);
+  }
+}
+void LIGAR_LED_4() { //ligar led 4 = LIGAR APÓS 10 DIAS - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (86400000 * 10 * intervalo))
+  {
+    digitalWrite(led4, LOW);
+  } else {
+    digitalWrite(led4, HIGH);
+  }
+}
+void LIGAR_LED_5() { //ligar led 5 = LIGAR APÓS 13 DIAS - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (86400000 * 13 * intervalo))
+  {
+    digitalWrite(led5, LOW);
+  } else {
+    digitalWrite(led5, HIGH);
+  }
+}
+void LIGAR_LED_6() { //ligar led 6 = LIGAR APÓS 16 DIA - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (86400000 * 16 * intervalo))
+  {
+    digitalWrite(led6, LOW);
+  } else {
+    digitalWrite(led6, HIGH);
+  }
+}
+void LIGAR_LED_7() { //ligar led 7 = LIGAR APÓS 19 DIA - PERMANCER LIGADA
+  if ((millis() - millis_antes) < (86400000 * 19 * intervalo))
+  {
+    digitalWrite(led7, LOW);
+  } else {
+    digitalWrite(led7, HIGH);
+  }
+}
